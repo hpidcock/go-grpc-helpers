@@ -19,7 +19,7 @@ var (
 )
 
 // CreateClient creates a client with the grpc:// and grpcs:// scheme.
-func CreateClient(uri string) (*grpc.ClientConn, error) {
+func CreateClient(uri string, options ...grpc.DialOption) (*grpc.ClientConn, error) {
 	address, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -32,11 +32,9 @@ func CreateClient(uri string) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
 	switch strings.ToLower(address.Scheme) {
 	case "grpc":
-		conn, err = grpc.Dial(address.Host,
-			grpc.WithInsecure())
-		if err != nil {
-			return nil, err
-		}
+		options = append([]grpc.DialOption{
+			grpc.WithInsecure(),
+		}, options...)
 	case "grpcs":
 		certPool, err := gocertifi.CACerts()
 		if err != nil {
@@ -46,13 +44,16 @@ func CreateClient(uri string) (*grpc.ClientConn, error) {
 			ServerName: address.Hostname(),
 			RootCAs:    certPool,
 		}
-		conn, err = grpc.Dial(address.Host,
-			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
-		if err != nil {
-			return nil, err
-		}
+		options = append([]grpc.DialOption{
+			grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
+		}, options...)
 	default:
 		return nil, ErrUnknownGRPCScheme
+	}
+
+	conn, err = grpc.Dial(address.Host, options...)
+	if err != nil {
+		return nil, err
 	}
 
 	return conn, nil
